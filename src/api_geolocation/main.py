@@ -344,3 +344,42 @@ def update_data(
         raise HTTPException(status_code=500, detail="")
 
     return {"updated": __transform_rows_to_records(rows)[0]}
+
+@app.delete(
+    "/ips/{ip}",
+    response_model=dict[str, Record],
+    responses={
+        404: {"description": "No data for specified ip address."},
+        500: {"description": "Internal Server Error."},
+    },
+)
+def delete_ip(
+    ip: Annotated[str, Path(title="IP address to get info about.", min_length=7, max_length=45)],
+    db: sqlite3.Connection = Depends(get_db_session)
+) -> dict[str, Record]:
+    """TODO: Add docstring"""
+    try:
+        cursor = db.cursor()
+
+        # Check for existence of ip to be updated
+        rows = cursor.execute("SELECT * FROM geolocation WHERE ip_address = ?", (ip,)).fetchall()
+
+    except sqlite3.Error:
+        raise HTTPException(status_code=500, detail="")
+
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"No data found for ip={ip}!")
+    
+    deleted_record = __transform_rows_to_records(rows)[0]
+
+    query = "DELETE FROM geolocation WHERE ip_address = ?"
+
+    try:
+        cursor.execute(query, (ip,))
+        db.commit()
+
+    except sqlite3.Error:
+        raise HTTPException(status_code=500, detail="")
+
+    return {"deleted": deleted_record}
+
